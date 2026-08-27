@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FST · TL & TC Attendance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#1b1d1a;--ink-soft:#5c5f57;--paper:#f6f4ec;--card:#fffdf6;
+  --line:#e0ddcf;--line-strong:#c9c5b2;
+  --present:#1f7a4d;--present-bg:#e3f3e7;--present-line:#bfe3c9;
+  --absent:#c0392b;--absent-bg:#fbe6e2;--absent-line:#f1c4bc;
+  --hold:#6d57b8;--hold-bg:#ece7f7;--train:#2f5d8a;--train-bg:#e2ecf6;
+  --future:#f1efe6;--accent:#d98324;
+  --shadow:0 1px 2px rgba(40,38,28,.06),0 8px 24px rgba(40,38,28,.06);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--paper);color:var(--ink);-webkit-font-smoothing:antialiased;line-height:1.45;font-size:15px}
+.mono{font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums}
+header{padding:32px 32px 20px;border-bottom:1px solid var(--line)}
+.eyebrow{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:8px}
+h1{font-family:'Fraunces',serif;font-weight:500;font-size:clamp(26px,4vw,40px);letter-spacing:-.01em;line-height:1.02}
+h1 em{font-style:italic;color:var(--ink-soft)}
+.sub{margin-top:10px;color:var(--ink-soft);max-width:640px;font-size:13.5px}
+.offline-badge{display:inline-block;background:var(--train-bg);color:var(--train);font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border-radius:5px;margin-left:10px;vertical-align:middle}
+
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;padding:20px 32px;border-bottom:1px solid var(--line)}
+.metric{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.metric:before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
+.metric.green:before{background:var(--present)}
+.metric .lbl{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-soft);font-weight:600}
+.metric .big{font-family:'Fraunces',serif;font-size:36px;font-weight:500;line-height:1;margin-top:8px}
+.metric .big .unit{font-size:15px;color:var(--ink-soft);font-family:'Inter';font-weight:500}
+.metric .sec{font-size:12.5px;color:var(--ink-soft);margin-top:7px;font-family:'JetBrains Mono',monospace}
+.metric.green .big{color:var(--present)}
+.metric .bar{height:5px;border-radius:3px;background:var(--line);margin-top:10px;overflow:hidden}
+.metric .bar i{display:block;height:100%;background:var(--present)}
+
+.controls{display:flex;flex-wrap:wrap;gap:10px 12px;align-items:center;padding:16px 32px;position:sticky;top:0;z-index:40;background:var(--paper);border-bottom:1px solid var(--line)}
+.controls .grp{display:flex;align-items:center;gap:6px}
+.controls label{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-soft);font-weight:600}
+select,input[type=search],input[type=date]{font-family:inherit;font-size:13px;padding:7px 11px;border:1px solid var(--line-strong);border-radius:9px;background:var(--card);color:var(--ink)}
+input[type=search]{min-width:180px}
+select:focus,input:focus{outline:2px solid var(--accent);outline-offset:1px}
+.seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:9px;overflow:hidden}
+.seg button{font-family:inherit;font-size:12px;font-weight:600;padding:7px 13px;border:0;background:var(--card);color:var(--ink-soft);cursor:pointer}
+.seg button.on{background:var(--ink);color:var(--paper)}
+.chk{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:500;color:var(--ink-soft);cursor:pointer;user-select:none}
+.chk input{width:15px;height:15px;accent-color:var(--accent)}
+.count{margin-left:auto;font-size:12px;color:var(--ink-soft)}
+.count b{color:var(--ink);font-weight:600}
+
+.wrap{padding:0 16px 50px;margin-top:8px;overflow:auto;max-height:calc(100vh - 70px)}
+table{border-collapse:separate;border-spacing:0;min-width:100%}
+th,td{white-space:nowrap}
+thead th{position:sticky;top:0;background:var(--paper);z-index:20;padding:8px 6px;font-size:12.5px;font-weight:600;color:var(--ink-soft);text-align:center;border-bottom:1px solid var(--line-strong)}
+thead th.day small{display:block;font-size:10.5px;font-weight:500;color:var(--ink-soft);opacity:.7}
+thead th.day .mo{display:block;font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--accent);font-weight:600}
+thead th.sun{color:var(--hold)}
+thead th.mstart{border-left:2px solid var(--accent)}
+th.name-h,td.name{position:sticky;left:0;z-index:15;background:var(--card);text-align:left;padding-left:16px;min-width:228px}
+td.name{background:var(--card);border-bottom:1px solid var(--line)}
+thead th.name-h{z-index:30;top:0;left:0;background:var(--paper)}
+th.stat-h,td.statcol{position:sticky;z-index:14;background:var(--card);text-align:center;min-width:62px;width:62px;font-family:'JetBrains Mono',monospace;font-size:12px;border-bottom:1px solid var(--line);border-left:1px solid var(--line)}
+td.statcol{color:var(--ink)}
+th.stat-h{z-index:24;top:0;background:var(--paper);color:var(--ink-soft);font-weight:600;font-size:10.5px;line-height:1.15;padding:4px 4px}
+th.stat-h small,td.statcol small{display:block;font-size:9px;color:var(--ink-soft);font-weight:500}
+.statcol.s-m{left:228px}
+.statcol.s-f{left:290px}
+th.stat-h.s-m{left:228px}
+th.stat-h.s-f{left:290px}
+td.statcol.s-f{border-right:2px solid var(--line-strong)}
+th.stat-h.s-f{border-right:2px solid var(--line-strong)}
+.emp-name{font-weight:600;font-size:14.5px}
+.emp-meta{font-size:11.5px;color:var(--ink-soft);font-family:'JetBrains Mono',monospace;margin-top:1px}
+td.cell{width:34px;height:46px;text-align:center;border-bottom:1px solid var(--line);border-left:1px solid var(--line);position:relative;padding:0}
+td.cell.mstart{border-left:2px solid var(--accent)}
+td.cell .glyph{line-height:1;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:15px;display:block}
+td.cell.P{background:var(--present-bg);color:var(--present)}
+td.cell.A{background:var(--absent-bg);color:var(--absent)}
+td.cell.A.nologin{background:repeating-linear-gradient(45deg,var(--absent-bg),var(--absent-bg) 4px,#f6d3cc 4px,#f6d3cc 8px)}
+td.cell.H{background:var(--hold-bg);color:var(--hold)}
+td.cell.T{background:var(--train-bg);color:var(--train)}
+td.cell.X{background:var(--future);color:transparent}
+td.cell.pre{box-shadow:inset 0 0 0 1px var(--present-line)}
+td.cell:hover{outline:2px solid var(--accent);outline-offset:-2px;z-index:5}
+td.cell.has:after{content:"";position:absolute;right:3px;bottom:3px;width:4px;height:4px;border-radius:50%;background:currentColor;opacity:.5}
+
+#tip{position:fixed;z-index:200;pointer-events:none;background:var(--ink);color:var(--paper);border-radius:10px;padding:11px 13px;font-size:13px;box-shadow:0 10px 30px rgba(0,0,0,.25);opacity:0;transition:opacity .12s;max-width:230px}
+#tip .t-h{font-weight:600;margin-bottom:6px}
+#tip .crit{display:flex;justify-content:space-between;gap:14px;font-family:'JetBrains Mono',monospace;font-size:11.5px;margin:2px 0}
+#tip .ok{color:#9be3b4}#tip .no{color:#f3a99e}
+#tip .note{margin-top:6px;font-size:10.5px;opacity:.75;font-style:italic}
+.legend{display:flex;flex-wrap:wrap;gap:16px;padding:16px 32px;border-top:1px solid var(--line);font-size:12px;color:var(--ink-soft)}
+.legend .key{display:flex;align-items:center;gap:7px}
+.legend .sw{width:16px;height:16px;border-radius:5px;border:1px solid var(--line-strong)}
+.note-foot{padding:6px 32px 40px;font-size:11.5px;color:var(--ink-soft);max-width:780px;font-style:italic}
+@media(max-width:640px){header,.metrics,.controls,.legend,.note-foot{padding-left:16px;padding-right:16px}.count{width:100%;margin:6px 0 0}}
+</style>
+</head>
+<body>
+<header>
+  <div class="eyebrow">FST · Field Sales Team</div>
+  <h1>TL & TC Attendance <em>Tracker</em></h1>
+  <p class="sub">Daily present/absent by TL & TC. TL: sign-in <11AM + (self + team BDE validate_meetings) ≥ 4 + 100% followups. TC: dials (meetings) ≥ 200 + 100% followups (no sign-in req). Striped (∅) = no sign-in.</p>
+</header>
+
+<div class="metrics" id="metrics"></div>
+
+<div class="controls">
+  <div class="grp"><label>From</label><input type="date" id="from"></div>
+  <div class="grp"><label>To</label><input type="date" id="to"></div>
+  <div class="grp"><label>Month</label>
+    <select id="month"><option value="">All</option></select></div>
+  <div class="grp"><label>Location</label>
+    <div class="seg" id="locSeg"></div></div>
+  <div class="seg" id="statusSeg">
+    <button data-f="" class="on">All</button>
+    <button data-f="A">Absent</button>
+    <button data-f="P">Present</button>
+  </div>
+  <label class="chk"><input type="checkbox" id="hideTrain"> Hide training</label>
+  <input type="search" id="q" placeholder="Search name or ID…">
+  <div class="count" id="count"></div>
+  <div id="updated" style="width:100%;font-size:11px;color:var(--ink-soft);margin-top:4px"></div>
+</div>
+
+<div class="wrap"><table id="grid"><thead></thead><tbody></tbody></table></div>
+
+<div class="legend" id="legend"></div>
+<p class="note-foot" id="footnote"></p>
+<div id="tip"></div>
+
+<script>
+const SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRIZrKuTJUdzshNzKht_KW70twLDExz7qC__iia1oYPE68KTeKlmcTrjiHjutOfsmlMfkuZTc1vX1af/pub?gid=316852425&single=true&output=csv";
+const REFRESH_MS = 5*60*1000;
+
+
+
+
+let DATA = null;
+const MEETING_ENFORCED_FROM = "2026-06-04";
+const MEETING_THRESHOLD_CHANGE_FROM = "2026-07-01";
+const NEW_MEETING_LOGIC_FROM = "2026-08-01"; // effective meetings = meetings - followups_done
+// Role values from new query: BDE, TL, TC, CM — include all non-empty
+const VALID_ROLES = new Set(['tl','tc']); // TL and TC only (CM hidden)
+
+function parseCSV(text){
+  const rows=[]; let i=0,f='',row=[],q=false;
+  while(i<text.length){
+    const c=text[i];
+    if(q){
+      if(c==='"'){ if(text[i+1]==='"'){f+='"';i++;} else q=false; }
+      else f+=c;
+    }else{
+      if(c==='"')q=true;
+      else if(c===','){row.push(f);f='';}
+      else if(c==='\n'){row.push(f);rows.push(row);row=[];f='';}
+      else if(c==='\r'){}
+      else f+=c;
+    }
+    i++;
+  }
+  if(f.length||row.length){row.push(f);rows.push(row);}
+  return rows;
+}
+function csvToObjects(text){
+  const rows=parseCSV(text).filter(r=>r.length>1||(r.length===1&&r[0].trim()!==''));
+  if(!rows.length) return [];
+  const hdr=rows[0].map(h=>h.trim().toLowerCase());
+  return rows.slice(1).map(r=>{const o={};hdr.forEach((h,i)=>o[h]=(r[i]??'').trim());return o;});
+}
+
+function timeToMin(v){
+  if(!v) return null;
+  let s=String(v).trim();
+  let dt=new Date(s.replace(' ','T'));
+  if(!isNaN(dt) && /\d{4}-\d{2}-\d{2}/.test(s)) return dt.getHours()*60+dt.getMinutes();
+  let m=s.match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*(am|pm)?/i);
+  if(m){let h=+m[1],mi=+m[2];const ap=(m[3]||'').toLowerCase();
+    if(ap==='pm'&&h<12)h+=12; if(ap==='am'&&h===12)h=0; return h*60+mi;}
+  // Handle M/D/YYYY H:MM:SS format
+  m=s.match(/\d+\/\d+\/\d+\s+(\d{1,2}):(\d{2}):?(\d{2})?\s*(am|pm)?/i);
+  if(m){let h=+m[1],mi=+m[2];const ap=(m[4]||'').toLowerCase();
+    if(ap==='pm'&&h<12)h+=12; if(ap==='am'&&h===12)h=0; return h*60+mi;}
+  return null;
+}
+function isoDate(v){
+  let s=String(v).trim();
+  let m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return `${m[1]}-${m[2]}-${m[3]}`;
+  m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); if(m){return `${m[3]}-${String(m[1]).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}`;}
+  let dt=new Date(s); if(!isNaN(dt)) return dt.toISOString().slice(0,10);
+  return null;
+}
+function num(v){if(v==null||String(v).trim()==='')return null;const n=parseFloat(String(v).replace(/[^\d.-]/g,''));return isNaN(n)?null:Math.trunc(n);}
+
+function evaluate(row, isoD, role, teamVM){
+  role=(role||'BDE').toUpperCase();
+  const rem=(row.remarks||'').toLowerCase();
+  const status=(row.status||'').toLowerCase();
+  if(rem.includes('week off')) return {code:'H'};
+  if(rem.includes('training')) return {code:'T'};
+  const smin=timeToMin(row.signintime);
+  const signin=smin==null?null:`${String(Math.floor(smin/60)).padStart(2,'0')}:${String(smin%60).padStart(2,'0')}`;
+  const mc=num(row.validate_meetings)||0;
+  const dials=num(row.meetings)||0;
+  const noLogin=smin==null;
+  const fsN=num(row.followup_set),fdN=num(row.followups_done);
+  let f=true,fset=0,fdone=0;
+  if(fsN!=null&&fdN!=null&&fsN>0){fset=fsN;fdone=fdN;f=fdone>=fset;}
+  const out={signin,signinMin:smin,mc,dials,role};
+
+  // TC: 200 dials + followups (no sign-in criterion)
+  if(role==='TC'){
+    const d=dials>=200;
+    out.code=(d&&f)?'P':'A';
+    out.d=d;out.f=f;out.fset=fset;out.fdone=fdone;out.dialThreshold=200;
+    return out;
+  }
+
+  const out2={...out};
+  if(isoD < MEETING_ENFORCED_FROM){
+    out2.code=status==='active'?'P':'A'; out2.pre=true;
+    if(out2.code==='A'&&noLogin) out2.nologin=true;
+    return out2;
+  }
+  const s=(!noLogin)&&(smin<11*60);
+
+  // TL: sign-in + (own validate_meetings + team BDE validate_meetings) >= 4 + followups
+  if(role==='TL'){
+    const totalVM=mc+(teamVM||0);
+    const m=totalVM>=4;
+    out2.code=(s&&m&&f)?'P':'A';
+    out2.m=m;out2.s=s;out2.f=f;out2.fset=fset;out2.fdone=fdone;
+    out2.totalVM=totalVM;out2.teamVM=teamVM||0;out2.meetThreshold=4;
+    if(out2.code==='A'&&noLogin) out2.nologin=true;
+    return out2;
+  }
+
+  // BDE / CM
+  const meetThreshold=isoD<MEETING_THRESHOLD_CHANGE_FROM?4:isoD<NEW_MEETING_LOGIC_FROM?3:5;
+  // From Aug 1: effective meetings = total meetings − followups_done (new visits only)
+  let effectiveMC, mcDisplay;
+  if(isoD>=NEW_MEETING_LOGIC_FROM){
+    const totalMtgs=num(row.meetings)||0;
+    // Only subtract followups that were NOT completed (incomplete visits only)
+    const incompleteFD = (fset>0 && fdone<fset) ? fdone : 0;
+    effectiveMC=Math.max(0,totalMtgs-incompleteFD);
+    mcDisplay=incompleteFD>0?`${effectiveMC} (${totalMtgs}-${incompleteFD})`:`${effectiveMC}`;
+  }else{
+    effectiveMC=mc; mcDisplay=String(mc);
+  }
+  const m=effectiveMC>=meetThreshold;
+  out2.code=(m&&s&&f)?'P':'A';
+  out2.m=m;out2.s=s;out2.f=f;out2.fset=fset;out2.fdone=fdone;
+  out2.meetThreshold=meetThreshold;out2.effectiveMC=effectiveMC;out2.mcDisplay=mcDisplay;
+  if(out2.code==='A'&&noLogin) out2.nologin=true;
+  return out2;
+}
+
+function buildDATA(objs){
+  const rows=objs.filter(r=>VALID_ROLES.has((r.role||'').toLowerCase()));
+  rows.forEach(r=>r._iso=isoDate(r.date));
+  const valid=rows.filter(r=>r._iso);
+  if(!valid.length) throw new Error('No rows with valid dates found');
+
+  // First pass: aggregate BDE validate_meetings per TL email per day
+  // (used to compute TL team_vm; requires own_email column in CSV — see SQL note)
+  const tlBdeVM={};
+  objs.forEach(r=>{
+    if((r.role||'').toLowerCase()!=='bde') return;
+    const te=(r.tl_email||'').toLowerCase().trim(); if(!te) return;
+    const iso=isoDate(r.date); if(!iso) return;
+    const vm=num(r.validate_meetings)||0;
+    if(!tlBdeVM[te]) tlBdeVM[te]={};
+    tlBdeVM[te][iso]=(tlBdeVM[te][iso]||0)+vm;
+  });
+
+  const isos=valid.map(r=>r._iso).sort();
+  const dmin=isos[0], dmax=isos[isos.length-1];
+  const start=new Date(dmin+'T00:00:00'), end=new Date(dmax+'T00:00:00');
+  const allDates=[]; for(let d=new Date(start); d<=end; d.setDate(d.getDate()+1)) allDates.push(new Date(d));
+  const byEmp={}, meta={};
+  valid.forEach(r=>{(byEmp[r.employee_id]=byEmp[r.employee_id]||{})[r._iso]=r; meta[r.employee_id]=r;});
+  const order=Object.values(meta).sort((a,b)=>
+    ((a.work_location__filter||'').localeCompare(b.work_location__filter||''))||
+    ((a.employee_name||'').localeCompare(b.employee_name||'')));
+  const dow=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], mon=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const fmt=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const days=allDates.map(d=>({iso:fmt(d),d:d.getDate(),mon:mon[d.getMonth()],dow:dow[d.getDay()],sun:d.getDay()===0,future:fmt(d)>dmax}));
+  const employees=order.map(mt=>{
+    const eid=mt.employee_id;
+    const role=(mt.role||'').toUpperCase();
+    const ownEmail=(mt.own_email||'').toLowerCase().trim();
+    const cells=allDates.map(d=>{
+      if(d.getDay()===0) return {code:'H'};
+      const iso=fmt(d); const row=byEmp[eid][iso];
+      if(!row) return {code:'X',future:iso>dmax,nodata:true};
+      const teamVM=role==='TL'?(tlBdeVM[ownEmail]||{})[iso]||0:0;
+      return evaluate(row, iso, role, teamVM);
+    });
+    return {id:eid,name:mt.employee_name,role,vintage:mt.agent_vintage||'',
+            tlEmail:mt.tl_email||'',ownEmail,loc:mt.work_location__filter,cells};
+  });
+  const months=[...new Set(allDates.map(d=>fmt(d).slice(0,7)))].sort();
+  const fullMonth=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  return {
+    rangeStart:dmin, rangeEnd:dmax, dataCutoff:dmax, meetingEnforcedFrom:MEETING_ENFORCED_FROM,
+    generatedAt:new Date().toISOString(),
+    days, employees,
+    locations:[...new Set(employees.map(e=>e.loc).filter(Boolean))].sort(),
+    months:months.map(m=>({val:m,label:fullMonth[+m.split('-')[1]-1]+' '+m.split('-')[0]}))
+  };
+}
+
+async function loadData(){
+  try{
+    const res=await fetch(SHEET_CSV+'&_='+Date.now(),{cache:'no-store'});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const text=await res.text();
+    DATA=buildDATA(csvToObjects(text));
+    initFromData(); render(); markUpdated(); setFootnote();
+  }catch(e){
+    document.getElementById('count').innerHTML=
+      '<span style="color:var(--absent)">Could not load sheet — '+e.message+'</span>';
+  }
+}
+function markUpdated(){
+  const el=document.getElementById('updated'); if(!el||!DATA.generatedAt) return;
+  el.textContent='Updated just now · auto-refreshes every 5 min';
+}
+
+const fromEl=document.getElementById('from'), toEl=document.getElementById('to');
+const monthSel=document.getElementById('month');
+const locSeg=document.getElementById('locSeg');
+let fFrom='', fTo='', fMonth='', fLocs=[], fStatus='', fQ='', fHideTrain=false;
+function daysInMonth(ym){const y=+ym.slice(0,4),m=+ym.slice(5,7);return new Date(y,m,0).getDate();}
+function isoOf(ym,d){return ym+'-'+String(d).padStart(2,'0');}
+function cellIndex(){
+  if(DATA._cidx) return DATA._cidx;
+  const idx={};
+  DATA.employees.forEach(e=>{const m={};e.cells.forEach((c,i)=>{m[DATA.days[i].iso]=c;});idx[e.id]=m;});
+  DATA._cidx=idx; return idx;
+}
+function visibleDayMetas(){
+  if(fMonth){
+    const n=daysInMonth(fMonth);
+    const dataIso=new Set(DATA.days.map(d=>d.iso));
+    const out=[];
+    for(let d=1;d<=n;d++){
+      const iso=isoOf(fMonth,d);
+      const dt=new Date(iso+'T00:00:00');
+      const dow=dt.toLocaleDateString('en-US',{weekday:'short'});
+      const mon=dt.toLocaleDateString('en-US',{month:'short'});
+      out.push({iso,d,mon,dow,sun:dt.getDay()===0,future:iso>DATA.dataCutoff,nodata:!dataIso.has(iso)});
+    }
+    return out;
+  }
+  return DATA.days.filter(dm=>dm.iso>=fFrom && dm.iso<=fTo);
+}
+function cellFor(empId,dm){
+  if(dm.sun) return {code:'H'};
+  const c=cellIndex()[empId][dm.iso];
+  if(c) return c;
+  return {code:'X',future:dm.future,nodata:true};
+}
+function initFromData(){
+  fFrom=DATA.rangeStart; fTo=DATA.rangeEnd;
+  fromEl.min=toEl.min=DATA.rangeStart; fromEl.max=toEl.max=DATA.rangeEnd;
+  fromEl.value=fFrom; toEl.value=fTo;
+  monthSel.length=1; DATA.months.forEach(m=>{const o=document.createElement('option');o.value=m.val;o.textContent=m.label;monthSel.appendChild(o)});
+  // Build multi-select location toggle buttons
+  locSeg.innerHTML='<button data-loc="" class="on">All</button>'+DATA.locations.map(l=>`<button data-loc="${l}">${l[0].toUpperCase()+l.slice(1)}</button>`).join('');
+  locSeg.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+    const loc=b.dataset.loc;
+    if(loc===''){// "All" clicked — clear everything
+      fLocs=[];[...locSeg.children].forEach(x=>x.classList.remove('on'));b.classList.add('on');
+    }else{
+      // Toggle this city
+      locSeg.querySelector('[data-loc=""]').classList.remove('on');
+      b.classList.toggle('on');
+      fLocs=[...locSeg.querySelectorAll('button.on')].map(x=>x.dataset.loc).filter(Boolean);
+      if(!fLocs.length){fLocs=[];locSeg.querySelector('[data-loc=""]').classList.add('on');}
+    }
+    render();
+  });
+}
+
+function inRange(iso){return iso>=fFrom && iso<=fTo;}
+function dayVisible(dm){
+  if(!inRange(dm.iso))return false;
+  if(fMonth && dm.iso.slice(0,7)!==fMonth)return false;
+  return true;
+}
+function empVisible(emp){
+  if(fLocs.length && !fLocs.includes(emp.loc))return false;
+  if(fQ){const s=(emp.name+' '+emp.id).toLowerCase();if(!s.includes(fQ))return false;}
+  return true;
+}
+// Check if employee has ANY real data (P/A/T) in visible range — if all X/H, they're exited/empty
+function empHasData(emp, dms){
+  return dms.some(dm=>{if(dm.sun)return false; const c=cellFor(emp.id,dm); return c.code!=='X';});
+}
+// Check if employee has any non-training active day in visible range
+function empHasNonTraining(emp, dms){
+  return dms.some(dm=>{if(dm.sun)return false; const c=cellFor(emp.id,dm); return c.code==='P'||c.code==='A';});
+}
+// Determine effective meeting threshold for the visible date range
+function effectiveThreshold(dms){
+  let has3=false, has4=false, has5=false;
+  dms.forEach(dm=>{if(!dm.sun){
+    if(dm.iso>=NEW_MEETING_LOGIC_FROM) has5=true;
+    else if(dm.iso>=MEETING_THRESHOLD_CHANGE_FROM) has3=true;
+    else has4=true;
+  }});
+  const buckets=[has4,has3,has5].filter(Boolean).length;
+  if(buckets>1){
+    const labels=[has4?'4':null,has3?'3':null,has5?'5':null].filter(Boolean);
+    return {val:null, label:labels.join('/')};
+  }
+  if(has5) return {val:5, label:'5'};
+  if(has3) return {val:3, label:'3'};
+  return {val:4, label:'4'};
+}
+
+function fmtTime(min){if(min==null)return '—';let h=Math.floor(min/60),m=min%60;return (h<10?'0':'')+h+':'+(m<10?'0':'')+m;}
+
+function isActiveCell(c){
+  return c && c.code!=='H' && c.code!=='T' && c.code!=='X';
+}
+function agentStats(emp, dms){
+  let meetSum=0, actDays=0;
+  let fDoneSum=0;
+  let fSetTot=0, fDoneOnSet=0;
+  dms.forEach(dm=>{
+    if(dm.sun) return;
+    const c=cellFor(emp.id,dm);
+    if(!isActiveCell(c)) return;
+    actDays++;
+    meetSum += (c.mc||0);
+    fDoneSum += (c.fdone||0);
+    if((c.fset||0)>0){ fSetTot+=c.fset; fDoneOnSet+=(c.fdone||0); }
+  });
+  return {
+    actDays,
+    avgMeet: actDays? meetSum/actDays : 0,
+    avgFollowDone: actDays? fDoneSum/actDays : 0,
+    followRate: fSetTot? Math.round(100*fDoneOnSet/fSetTot) : null,
+    fSetTot, fDoneOnSet
+  };
+}
+function computeMetrics(){
+  const dms=visibleDayMetas();
+  let meetSum=0, actDays=0;
+  let signedMeetSum=0, signedActiveDays=0;
+  let loginSum=0,loginCnt=0;
+  let present=0,evalDays=0;
+  let fDoneSum=0, fSetTot=0, fDoneOnSet=0;
+  const activeAgents=new Set();
+  DATA.employees.forEach(emp=>{
+    if(!empVisible(emp))return;
+    dms.forEach(dm=>{
+      if(dm.sun)return;
+      const c=cellFor(emp.id,dm);
+      if(!isActiveCell(c))return;
+      actDays++;
+      meetSum+=(c.mc||0);
+      fDoneSum+=(c.fdone||0);
+      if((c.fset||0)>0){fSetTot+=c.fset;fDoneOnSet+=(c.fdone||0);}
+      if(c.code==='P'||c.code==='A'){evalDays++; if(c.code==='P')present++;}
+      if(c.signinMin!=null){loginSum+=c.signinMin;loginCnt++;}
+      if((c.mc||0)>=1){signedMeetSum+=c.mc;signedActiveDays++;activeAgents.add(emp.id);}
+    });
+  });
+  return {
+    avgMeet: actDays? (meetSum/actDays):0,
+    avgMeetSignedOnly: signedActiveDays? (signedMeetSum/signedActiveDays):0,
+    activeAgentCount: activeAgents.size,
+    avgLogin: loginCnt? Math.round(loginSum/loginCnt):null,
+    presentRate: evalDays? Math.round(100*present/evalDays):0,
+    present, evalDays,
+    avgFollowDone: actDays? (fDoneSum/actDays):0,
+    followRate: fSetTot? Math.round(100*fDoneOnSet/fSetTot):null,
+    fDoneOnSet, fSetTot
+  };
+}
+function renderMetrics(){
+  const m=computeMetrics();
+  const dms=visibleDayMetas();
+  const thresh=effectiveThreshold(dms);
+  const threshDenom=thresh.val||4; // use 4 as fallback for mixed range bar calc
+  const frate = m.followRate==null ? '—' : m.followRate+'%';
+  document.getElementById('metrics').innerHTML=`
+    <div class="metric">
+      <div class="lbl">Avg meetings / active day</div>
+      <div class="big">${m.avgMeet.toFixed(1)}<span class="unit"> / ${thresh.label}</span></div>
+      <div class="sec">Days w/ ≥1 meet: ${m.avgMeetSignedOnly.toFixed(1)} · ${m.activeAgentCount} agents w/ ≥1 meet</div>
+      <div class="bar"><i style="width:${Math.min(100,m.avgMeet/threshDenom*100)}%"></i></div>
+    </div>
+    <div class="metric">
+      <div class="lbl">Avg login time</div>
+      <div class="big">${fmtTime(m.avgLogin)}</div>
+      <div class="sec">Excludes no-login days</div>
+    </div>
+    <div class="metric">
+      <div class="lbl">Followups / active day</div>
+      <div class="big">${m.avgFollowDone.toFixed(2)}</div>
+      <div class="sec">Completion: ${frate}${m.fSetTot?` (${m.fDoneOnSet}/${m.fSetTot} set)`:''}</div>
+    </div>
+    <div class="metric green">
+      <div class="lbl">Present rate</div>
+      <div class="big">${m.presentRate}<span class="unit">%</span></div>
+      <div class="sec">${m.present} present / ${m.evalDays} evaluated days</div>
+      <div class="bar"><i style="width:${m.presentRate}%"></i></div>
+    </div>`;
+}
+function critLine(l,ok,d){return `<div class="crit"><span>${l}</span><span class="${ok?'ok':'no'}">${d}</span></div>`;}
+function tipHTML(emp,dm,c){
+  let h=`<div class="t-h">${emp.name} · ${dm.d} ${dm.mon} (${dm.dow})</div>`;
+  if(c.code==='H')return h+'Holiday — Sunday off';
+  if(c.code==='T')return h+'Training day';
+  if(c.code==='X')return h+'No data recorded';
+  if(c.nologin){h+=`<div class="crit"><span>No sign-in</span><span class="no">absent</span></div>`;h+=`<div class="note">Did not log in — counts as absent</div>`;if(emp.vintage){h+=`<div class="crit"><span>Vintage</span><span style="opacity:.8">${emp.vintage}</span></div>`;}if(emp.tlEmail){h+=`<div class="crit"><span>TL</span><span style="opacity:.8;font-size:10.5px">${emp.tlEmail}</span></div>`;}return h;}
+  if(c.pre){h+=critLine('Sign-in',!!c.signin,c.signin||'no sign-in');h+=critLine('Meetings',c.mc>=1,(c.mc||0));h+=`<div class="note">Before meeting-check enforcement (from Jun 4) — source status</div>`;return h;}
+  // TC: dials + followups
+  if(emp.role==='TC'){
+    h+=critLine('Dials ≥200',c.d,(c.dials||0)+' / 200');
+    h+=critLine('Followups',c.f,c.fset>0?(c.fdone+' / '+c.fset):'none set');
+    if(emp.vintage){h+=`<div class="crit"><span>Vintage</span><span style="opacity:.8">${emp.vintage}</span></div>`;}
+    if(emp.tlEmail){h+=`<div class="crit"><span>TL</span><span style="opacity:.8;font-size:10.5px">${emp.tlEmail}</span></div>`;}
+    return h;
+  }
+  // TL: sign-in + team meetings + followups
+  if(emp.role==='TL'){
+    h+=critLine('Team meets ≥4',c.m,(c.totalVM||0)+' / 4 (self '+(c.mc||0)+' + BDEs '+(c.teamVM||0)+')');
+    h+=critLine('Sign-in <11AM',c.s,c.signin||'no sign-in');
+    h+=critLine('Followups',c.f,c.fset>0?(c.fdone+' / '+c.fset):'none set');
+    if(emp.vintage){h+=`<div class="crit"><span>Vintage</span><span style="opacity:.8">${emp.vintage}</span></div>`;}
+    return h;
+  }
+  // BDE / CM
+  h+=critLine('Meetings ≥'+c.meetThreshold,c.m,(c.mcDisplay||c.mc||0)+' / '+c.meetThreshold);
+  h+=critLine('Sign-in <11AM',c.s,c.signin||'no sign-in');
+  h+=critLine('Followups',c.f,c.fset>0?(c.fdone+' / '+c.fset):'none set');
+  if(emp.vintage){h+=`<div class="crit"><span>Vintage</span><span style="opacity:.8">${emp.vintage}</span></div>`;}
+  if(emp.tlEmail){h+=`<div class="crit"><span>TL</span><span style="opacity:.8;font-size:10.5px">${emp.tlEmail}</span></div>`;}
+  return h;
+}
+
+function render(){
+  if(!DATA) return;
+  renderMetrics();
+  const thead=document.querySelector('#grid thead'), tbody=document.querySelector('#grid tbody');
+  const dms=visibleDayMetas();
+  let prevMon=null;
+  let hr='<tr><th class="name-h">BDE</th>'+'<th class="stat-h s-m">Mtg<small>/act day</small></th>'+'<th class="stat-h s-f">F-up<small>/act day</small></th>';
+  dms.forEach(d=>{const ms=d.iso.slice(0,7)!==prevMon;prevMon=d.iso.slice(0,7);
+    hr+=`<th class="day${d.sun?' sun':''}${ms?' mstart':''}">${ms?`<span class="mo">${d.mon}</span>`:''}${d.d}<small>${d.dow}</small></th>`;});
+  hr+='</tr>'; thead.innerHTML=hr;
+
+  let shown=0, rows='';
+  DATA.employees.forEach(emp=>{
+    if(!empVisible(emp))return;
+    // Skip employees with zero data in visible range (exited / not yet joined)
+    if(!empHasData(emp, dms))return;
+    // Hide Training: skip rows that are training-only (no P/A days)
+    if(fHideTrain && !empHasNonTraining(emp, dms))return;
+    if(fStatus && !dms.some(dm=>cellFor(emp.id,dm).code===fStatus))return;
+    shown++;
+    const st=agentStats(emp,dms);
+    const mCol = st.actDays? st.avgMeet.toFixed(1) : '—';
+    const fCol = st.actDays? st.avgFollowDone.toFixed(2) : '—';
+    let r=`<tr><td class="name"><div class="emp-name">${emp.name}</div><div class="emp-meta">${emp.id} · ${emp.role} · ${emp.vintage} · ${emp.loc}</div></td>`+`<td class="statcol s-m">${mCol}</td>`+`<td class="statcol s-f">${fCol}</td>`;
+    prevMon=null;
+    dms.forEach((dm,k)=>{
+      const c=cellFor(emp.id,dm);
+      const ms=dm.iso.slice(0,7)!==prevMon; prevMon=dm.iso.slice(0,7);
+      let code=c.code;
+      const dim=fStatus && code!==fStatus ? 'opacity:.26;':'';
+      let glyph=code==='P'?'P':code==='A'?(c.nologin?'∅':'A'):code==='H'?'·':code==='T'?'T':'';
+      const has=(code==='P'||code==='A')&&!c.pre?' has':'';
+      r+=`<td class="cell ${code}${c.pre?' pre':''}${c.nologin?' nologin':''}${ms?' mstart':''}${has}" style="${dim}" data-e="${emp.id}" data-iso="${dm.iso}"><span class="glyph">${glyph}</span></td>`;
+    });
+    r+='</tr>'; rows+=r;
+  });
+  tbody.innerHTML=rows||`<tr><td class="name" style="padding:24px;color:var(--ink-soft)">No BDEs match these filters.</td></tr>`;
+  document.getElementById('count').innerHTML=`<b>${shown}</b>/${DATA.employees.length} BDEs · ${dms.length} days`;
+}
+
+// tooltip
+const tip=document.getElementById('tip');
+const grid=document.getElementById('grid');
+grid.addEventListener('mouseover',ev=>{const td=ev.target.closest('td.cell');if(!td){tip.style.opacity='0';return;}
+  const emp=DATA.employees.find(x=>x.id===td.dataset.e), iso=td.dataset.iso;
+  const dm=visibleDayMetas().find(d=>d.iso===iso); const c=cellFor(emp.id,dm);
+  if(c.code==='X'){tip.style.opacity='0';return;} tip.innerHTML=tipHTML(emp,dm,c);tip.style.opacity='1';});
+grid.addEventListener('mousemove',ev=>{if(tip.style.opacity!=='1')return;
+  let x=ev.clientX+14,y=ev.clientY+14;const r=tip.getBoundingClientRect();
+  if(x+r.width>innerWidth)x=ev.clientX-r.width-14; if(y+r.height>innerHeight)y=ev.clientY-r.height-14;
+  tip.style.left=x+'px';tip.style.top=y+'px';});
+grid.addEventListener('mouseout',ev=>{if(!ev.relatedTarget||!ev.relatedTarget.closest('td.cell'))tip.style.opacity='0';});
+
+// control wiring
+fromEl.onchange=e=>{fFrom=e.target.value; if(fFrom>fTo){fTo=fFrom;toEl.value=fTo;} fMonth='';monthSel.value=''; render();};
+toEl.onchange=e=>{fTo=e.target.value; if(fTo<fFrom){fFrom=fTo;fromEl.value=fFrom;} fMonth='';monthSel.value=''; render();};
+monthSel.onchange=e=>{fMonth=e.target.value;
+  if(fMonth){ const n=daysInMonth(fMonth); fFrom=isoOf(fMonth,1); fTo=isoOf(fMonth,n);
+    fromEl.value=fFrom; toEl.value=fTo;
+  } else { fFrom=DATA.rangeStart; fTo=DATA.rangeEnd; fromEl.value=fFrom; toEl.value=fTo; }
+  render();};
+document.getElementById('q').oninput=e=>{fQ=e.target.value.trim().toLowerCase();render();};
+document.getElementById('hideTrain').onchange=e=>{fHideTrain=e.target.checked;render();};
+document.getElementById('statusSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  [...e.currentTarget.children].forEach(x=>x.classList.remove('on'));b.classList.add('on');fStatus=b.dataset.f;render();});
+
+document.getElementById('legend').innerHTML=`
+  <div class="key"><span class="sw" style="background:var(--present-bg);border-color:var(--present-line)"></span> P · Present</div>
+  <div class="key"><span class="sw" style="background:var(--absent-bg);border-color:var(--absent-line)"></span> A · Absent (criteria fail)</div>
+  <div class="key"><span class="sw" style="background:repeating-linear-gradient(45deg,var(--absent-bg),var(--absent-bg) 3px,#f6d3cc 3px,#f6d3cc 6px)"></span> ∅ · Absent — no sign-in</div>
+  <div class="key"><span class="sw" style="background:var(--train-bg)"></span> T · Training</div>
+  <div class="key"><span class="sw" style="background:var(--hold-bg)"></span> · Holiday (Sunday)</div>
+  <div class="key"><span class="sw" style="background:var(--present-bg);box-shadow:inset 0 0 0 2px var(--present-line)"></span> outlined = before meeting-check enforcement</div>`;
+function setFootnote(){ if(!DATA) return; document.getElementById('footnote').textContent=
+  `Data available ${DATA.rangeStart} to ${DATA.rangeEnd}. TL criteria: sign-in <11AM + (own + team BDE validate_meetings) ≥ 4 + 100% followups. TC criteria: dials (meetings col) ≥ 200 + 100% followups. Metrics cover Mon–Sat working days.`; }
+
+loadData();
+setInterval(loadData, REFRESH_MS);
+</script>
+</body>
+</html>
